@@ -1,0 +1,49 @@
+---
+- name: Deploy metrics-server
+  hosts: localhost
+  tasks:
+    - name: Download metrics-server manifest to the cluster.
+      ansible.builtin.get_url:
+        url: https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+        dest: ~/metrics-server.yaml
+        mode: "0664"
+
+    - name: Apply metrics-server manifest to the cluster.
+      kubernetes.core.k8s:
+        state: present
+        src: ~/metrics-server.yaml
+
+- name: Deploy prometheus, grafana and alertmanager
+  hosts: localhost
+  tasks:
+    - name: Add prometheus-community repo
+      kubernetes.core.helm_repository:
+        name: prometheus-community
+        repo_url: "https://prometheus-community.github.io/helm-charts"
+
+    - name: Deploy kube-prometheus-stack in the monitoring namespace
+      kubernetes.core.helm:
+        name: prometheus
+        chart_ref: prometheus-community/kube-prometheus-stack
+        release_namespace: monitoring
+        create_namespace: true
+
+- name: Deploy argocd
+  hosts: localhost
+  tasks:
+    - name: Create argocd namespace
+      kubernetes.core.k8s:
+        name: argocd
+        api_version: v1
+        kind: Namespace
+        state: absent
+    - name: Download argocd manifest to the cluster.
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+        dest: ~/argocd.yaml
+        mode: "0664"
+    - name: Apply argocd manifest to the cluster.
+      kubernetes.core.k8s:
+        state: absent
+        namespace: argocd
+        src: ~/argocd.yaml
